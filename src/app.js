@@ -150,4 +150,68 @@ app.post('/jobs/:jobId/pay', getProfile, async (req, res) => {
   }
 })
 
+/*
+//Task 5 waiting for clarifications
+app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
+
+})
+*/
+
+app.get('/admin/best-profession', getProfile, async (req, res) => {
+  // eslint-disable-next-line no-unused-vars
+  const { Contract, Job, Profile } = req.app.get('models')
+  const start = new Date(req.query.start)
+  const end = new Date(req.query.end)
+  if (isNaN(start) || isNaN(end)) {
+    return res.status(400).end()
+  }
+  console.log(`start: ${start}, end: ${end}`)
+  console.log(sequelize)
+  let seqQResult
+  try {
+    // j.id as jobId , j.price as price, j.paid as paid , c.id as contractId p.id as profileId p.profession as proffesion
+    seqQResult = await sequelize.query(`
+        SELECT SUM(j.price) as total_price, p.profession as profession       
+        FROM Profiles as p, Contracts as c, Jobs as j
+        where j.ContractId = c.id and p.id = c.ContractorId and j.paid = true and j.paymentDate >= "${req.query.start}" and j.paymentDate <= "${req.query.end}"
+        GROUP BY p.profession
+        ORDER BY total_price DESC
+        LIMIT 1`)
+    console.log(JSON.stringify(seqQResult, null, 4))
+    /*
+    //I tried making sequelize work but it took too long to figure out the syntax for association between tables with multiple associations
+    //TODO: try again later if I can find the time
+    // I could have pulled an aggregate of contracts and then process on the client but it is never a good idea with databases
+    //My solution above is still not very good because it might be brittle if we change DB for example and the syntax would be different
+    const results = await Job.findAll({
+      include: [{
+        model: Contract,
+        attributes: ['ContractorId', [Sequelize.col('id'), 'profileId']],
+        foreignKey: 'ContractId',
+        include: [{
+          model: Profile,
+          attributes: ['profession'],
+          where: { profileId: Sequelize.col('ContractorId') }
+        }]
+      }
+      ],
+      attributes: [[Sequelize.fn('SUM', Sequelize.col('price')), 'total_price'], 'ContractId'],
+      where: {
+        paid: true
+      },
+      order: [[Sequelize.col('total_price'), 'DESC']],
+      group: ['ContractId']
+    })
+    console.log(JSON.stringify(results, null, 4))
+    */
+
+    if (seqQResult && seqQResult[0] && seqQResult[0].length && seqQResult[0][0]) {
+      res.json(seqQResult[0][0].profession)
+    }
+  } catch (err) {
+    console.log(err)
+  }
+  return res.status(404).end()
+})
+
 module.exports = app
