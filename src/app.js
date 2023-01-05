@@ -16,6 +16,8 @@ const TERMINATED_CONTRACT = 'terminated'
  * FIX ME!
  * @returns contract by id
  */
+// curl -v localhost:3001/contracts/2 -H 'profile_id: 1'
+// curl -v localhost:3001/contracts/3 -H 'profile_id: 1'
 app.get('/contracts/:id', getProfile, async (req, res) => {
   const { Contract } = req.app.get('models')
   const { id } = req.params
@@ -38,6 +40,7 @@ const getContractsQueryForId = (id) => {
   }
 }
 
+// curl -v localhost:3001/contracts/ -H 'profile_id: 1'
 app.get('/contracts/', getProfile, async (req, res) => {
   const { Contract } = req.app.get('models')
   const id = req.profile.id
@@ -56,6 +59,7 @@ app.get('/contracts/', getProfile, async (req, res) => {
   res.json(results)
 })
 
+// curl -X GET -v localhost:3001/jobs/unpaid -H 'profile_id: 2'
 app.get('/jobs/unpaid', getProfile, async (req, res) => {
   const { Contract, Job } = req.app.get('models')
   const id = req.profile.id
@@ -97,6 +101,8 @@ function updateClientBalance (clientId, balance, req) {
   })
 }
 
+// curl -X POST -v localhost:3001/jobs/14/pay -H 'profile_id: 6'
+// curl -X POST -v localhost:3001/jobs/4/pay -H 'profile_id: 2'
 app.post('/jobs/:jobId/pay', getProfile, async (req, res) => {
   const { Contract, Job, Profile } = req.app.get('models')
   const id = req.profile.id
@@ -115,7 +121,10 @@ app.post('/jobs/:jobId/pay', getProfile, async (req, res) => {
         }
         ],
         where: {
-          paid: false,
+          [Sequelize.Op.or]: [
+            { paid: false },
+            { paid: null }
+          ],
           id: jobId
         }
       })
@@ -198,6 +207,9 @@ app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
   }
 })
 
+// curl -X GET -v "localhost:3001/admin/best-profession?start=2020-01-15&end=2022-08-15" -H 'profile_id: 1'
+// curl -X GET -v "localhost:3001/admin/best-profession?start=2022-08-16&end=2022-08-17" -H 'profile_id: 1'
+// curl -X GET -v "localhost:3001/admin/best-profession?start=2020-08-10&end=2020-08-11" -H 'profile_id: 1'
 app.get('/admin/best-profession', getProfile, async (req, res) => {
   // eslint-disable-next-line no-unused-vars
   const { Contract, Job, Profile } = req.app.get('models')
@@ -259,6 +271,8 @@ app.get('/admin/best-profession', getProfile, async (req, res) => {
 
 // Task 7:
 // copy pasting because I'm tired :) will refactor later
+// curl -X GET -v "localhost:3001/admin/best-clients?start=2020-08-16&end=2020-08-17&limit=10" -H 'profile_id: 1'
+// curl -X GET -v "localhost:3001/admin/best-clients?start=2020-01-16&end=2022-08-17&limit=10" -H 'profile_id: 1'
 app.get('/admin/best-clients', getProfile, async (req, res) => {
   // eslint-disable-next-line no-unused-vars
   const { Contract, Job, Profile } = req.app.get('models')
