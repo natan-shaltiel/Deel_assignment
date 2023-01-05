@@ -25,22 +25,27 @@ app.get('/contracts/:id',getProfile ,async (req, res) =>{
     res.json(contract)
 })
 
+const getContractsQueryForId = (id) => {
+    return {        
+        where: {
+          [Sequelize.Op.or]: [
+            { ClientId:id },
+            { ContractorId:id}   
+          ],
+          status: {[Sequelize.Op.ne]: TERMINATED_CONTRACT}
+        }
+    }
+}
+
 app.get('/contracts/',getProfile ,async (req, res) =>{
     const {Contract} = req.app.get('models')
     const id = req.profile.id;
     let results;
 
     try {
+        const query = getContractsQueryForId(id);
 
-        results = await Contract.findAll({
-            where: {
-              [Sequelize.Op.or]: [
-                { ClientId:id },
-                { ContractorId:id}   
-              ],
-              status: {[Sequelize.Op.ne]: TERMINATED_CONTRACT}
-            }
-        })
+        results = await Contract.findAll(query);
 
     } catch (err ) {
         console.log(err);
@@ -56,6 +61,7 @@ app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
     const {Contract,Job} = req.app.get('models')
     const id = req.profile.id;
     let results;
+    const contractQuery = getContractsQueryForId(id);
 
     try {
         //TODO: refactor move the where statement of Contract to a joint structure with the previous query
@@ -63,13 +69,7 @@ app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
             include: [{
                 model: Contract,
                 attributes: [],
-                where: {
-                    [Sequelize.Op.or]: [
-                      { ClientId:id },
-                      { ContractorId:id}   
-                    ],
-                    status: {[Sequelize.Op.ne]: TERMINATED_CONTRACT}
-                  }
+                where: contractQuery.where
             }],
             where: {
               paid: false,
@@ -85,5 +85,12 @@ app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
     res.json(results);
     
 })
+
+app.post('/jobs/pay',getProfile ,async (req, res) =>{
+    const {Contract,Job} = req.app.get('models')
+    const id = req.profile.id;
+    let results;
+
+});
 
 module.exports = app;
