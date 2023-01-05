@@ -21,6 +21,7 @@ app.get('/contracts/:id', getProfile, async (req, res) => {
   const { id } = req.params
   const profileId = req.profile.id
   const contract = await Contract.findOne({ where: { id } })
+  // purposefully sending "not found" as it is more secure than letting them know that there is one and they are not authorized
   if (!contract || (contract.ContractorId != profileId && contract.ClientId != profileId)) return res.status(404).end()
   res.json(contract)
 })
@@ -150,12 +151,52 @@ app.post('/jobs/:jobId/pay', getProfile, async (req, res) => {
   }
 })
 
-/*
-//Task 5 waiting for clarifications
+// curl -X POST -v localhost:3001/balances/deposit/1 -H 'profile_id: 1' -H 'Content-Type: application/json; charset=utf-8'  -d '{"amount": 100}'
 app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
+  console.log(req.body)
+  const amount = req?.body?.amount
+  if (!amount || isNaN(amount)) {
+    return res.status(400).end()
+  }
+  const { userId } = req.params
+  if (userId != req.profile.id) {
+    return res.status(401).end()
+  }
+  let success = false
+  try {
+    await sequelize.transaction(async transaction => {
+    // I tried making sequelize work but it took too long to figure out the syntax for association between tables with multiple associations
+    // TODO: try again later if I can find the time
 
+      // I'm including non terminated contracts - I'm not sure what was the requirement so I don't want to be restrictive
+      const seqQResult = await sequelize.query(`
+      SELECT SUM(j.price) as total_price, p.id as clientId, p.balance as balance       
+      FROM Profiles as p, Contracts as c, Jobs as j
+      where j.ContractId = c.id and p.id = c.ClientId and p.id = ${userId} and (j.paid IS NULL OR j.paid = 0)
+      
+      `)
+      //
+      console.log(JSON.stringify(seqQResult, null, 4))
+      let totalPrice
+      let balance
+      if (seqQResult?.length && seqQResult[0]?.length) {
+        totalPrice = seqQResult[0][0].total_price
+        balance = seqQResult[0][0].balance
+      }
+      if (totalPrice && totalPrice / 4 >= amount) {
+        await updateClientBalance(userId, balance + amount, req)
+        success = true
+      }
+    })
+  } catch (err) {
+    console.log(err)
+  }
+  if (success) {
+    return res.status(200).end()
+  } else {
+    return res.status(400).end()
+  }
 })
-*/
 
 app.get('/admin/best-profession', getProfile, async (req, res) => {
   // eslint-disable-next-line no-unused-vars
@@ -170,6 +211,8 @@ app.get('/admin/best-profession', getProfile, async (req, res) => {
   let seqQResult
   try {
     // j.id as jobId , j.price as price, j.paid as paid , c.id as contractId p.id as profileId p.profession as proffesion
+
+    // TODO: while my check above minimizes the possibilty for sql injection - I would still double check here...
     seqQResult = await sequelize.query(`
         SELECT SUM(j.price) as total_price, p.profession as profession       
         FROM Profiles as p, Contracts as c, Jobs as j
