@@ -70,7 +70,10 @@ app.get('/jobs/unpaid', getProfile, async (req, res) => {
         where: contractQuery.where
       }],
       where: {
-        paid: false
+        [Sequelize.Op.or]: [
+          { paid: false },
+          { paid: null }
+        ]
       }
     })
   } catch (err) {
