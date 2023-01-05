@@ -82,6 +82,17 @@ app.get('/jobs/unpaid', getProfile, async (req, res) => {
   res.json(results)
 })
 
+function updateClientBalance (clientId, balance, req) {
+  const { Profile } = req.app.get('models')
+  return Profile.update({
+    balance
+  }, {
+    where: {
+      id: clientId
+    }
+  })
+}
+
 app.post('/jobs/:jobId/pay', getProfile, async (req, res) => {
   const { Contract, Job, Profile } = req.app.get('models')
   const id = req.profile.id
@@ -91,35 +102,36 @@ app.post('/jobs/:jobId/pay', getProfile, async (req, res) => {
   // TODO: I would have probably optimized it but trying to stick to the timeline
   try {
     await sequelize.transaction(async transaction => {
+      // TODO: I should grab the profiles of both client and contractor with this fetch (need to learn how)
       const job = await Job.findOne({
         include: [{
           model: Contract,
-          attributes: ['ClientId'],
+          attributes: ['ClientId', 'ContractorId'],
           where: contractQuery.where
-        }],
+        }
+        ],
         where: {
           paid: false,
           id: jobId
         }
       })
-      console.log(job)
       if (!job || job.Contract.ClientId != id) return // I am not the client
-      const profile = await Profile.findOne({ id })
-      if (profile.balance < job.price) return
-      await Job.update({
-        paid: true
-      }, {
-        where: {
-          id: jobId
-        }
-      })
-      await Profile.update({
-        balance: profile.balance - job.price
-      }, {
-        where: {
-          id
-        }
-      })
+      const profile = await Profile.findOne({ where: { id } })
+      if (!profile || profile.balance < job.price) return
+      const contractorProfile = await Profile.findOne({ where: { id: job.Contract.ContractorId } })
+      if (!contractorProfile) return
+      console.log(`client: ${profile.id} balance:${profile.balance}, contractor:${contractorProfile.id}, balance:${contractorProfile.balance}`)
+      const updateJob = Job.update(
+        {
+          paid: true
+        }, {
+          where: {
+            id: jobId
+          }
+        })
+      const clientPromise = updateClientBalance(id, profile.balance - job.price, req)
+      const contractorPromise = updateClientBalance(contractorProfile.id, contractorProfile.balance + job.price, req)
+      await Promise.all([updateJob, clientPromise, contractorPromise])
       console.log('success')
       success = true
     })
