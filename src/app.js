@@ -7,6 +7,10 @@ app.use(bodyParser.json());
 app.set('sequelize', sequelize)
 app.set('models', sequelize.models)
 
+const { Sequelize } = require('sequelize');
+
+const TERMINATED_CONTRACT = 'terminated';
+
 /**
  * FIX ME!
  * @returns contract by id
@@ -20,9 +24,32 @@ app.get('/contracts/:id',getProfile ,async (req, res) =>{
     if(!contract || (contract.ContractorId != profileId && contract.ClientId != profileId)) return res.status(404).end()
     res.json(contract)
 })
+
+app.get('/contracts/',getProfile ,async (req, res) =>{
+    const {Contract} = req.app.get('models')
+    const id = req.profile.id;
+    let results;
+    let clientResults;
+
+    try {
+
+        results = await Contract.findAll({
+            where: {
+              [Sequelize.Op.or]: [
+                { ClientId:id },
+                { ContractorId:id}   
+              ],
+              status: {[Sequelize.Op.ne]: TERMINATED_CONTRACT}
+            }
+        })
+
+    } catch (err ) {
+        console.log(err);
     }
+    if (!results || results.length == 0) {
+        return res.status(404).end()
+    }
+    res.json(results);
     
-    if(!contract) return res.status(404).end()
-    res.json(contract)
 })
 module.exports = app;
