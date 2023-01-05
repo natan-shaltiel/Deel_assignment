@@ -86,10 +86,58 @@ app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
     
 })
 
-app.post('/jobs/pay',getProfile ,async (req, res) =>{
-    const {Contract,Job} = req.app.get('models')
+app.post('/jobs/:jobId/pay',getProfile ,async (req, res) =>{
+    const {Contract, Job, Profile} = req.app.get('models')
     const id = req.profile.id;
-    let results;
+    const { jobId } = req.params;
+    const contractQuery = getContractsQueryForId(id);
+    let success = false;
+    //TODO: I would have probably optimized it but trying to stick to the timeline
+    try {
+        await sequelize.transaction(async transaction => {
+            const job = await Job.findOne({
+                include: [{
+                    model: Contract,
+                    attributes: ["ClientId"],
+                    where: contractQuery.where
+                }],
+                where: {
+                paid: false,
+                id:jobId
+                }
+            });
+            console.log(job);
+            if (!job || job.Contract.ClientId != id) return; //I am not the client
+            const profile = await Profile.findOne({id});
+            if (profile.balance < job.price) return;
+            await Job.update({
+                paid: true
+            }, {
+                where: {
+                    id:jobId
+                }
+            });
+            await Profile.update( {
+                balance: profile.balance - job.price
+            }, {
+                where: {
+                    id: id
+                }
+            })
+            console.log("success");
+            success = true;
+        });
+    } catch (err) {
+        console.log("error");
+        success = false;
+    }
+    //TODO: I would add reason
+    if (success) {
+        return res.status(200).end();
+    } else {
+        return res.status(400).end();
+    }
+    
 
 });
 
